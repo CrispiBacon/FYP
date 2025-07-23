@@ -3,15 +3,21 @@ from flask import Flask, request, render_template
 #from sklearn.feature_extraction.text import TfidfVectorizer
 from transformers import BertTokenizer, BertForSequenceClassification
 import torch
+from data_preprocessing.textcleanpipeline import clean_text_pipeline, TextCleaner
+import os
 app = Flask(__name__)
 
 #import os
 #print("Current Working Directory:", os.getcwd())
 
-# Load the model and tokenizer
-model_path = r'5. Modelling\bert_model'
-tokenizer = BertTokenizer.from_pretrained(model_path)
-model = BertForSequenceClassification.from_pretrained(model_path)
+# Get the directory of the current script (app.py)
+base_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Step OUT of "6. Deployment" and into "5. Modelling/Bert_model"
+model_path = os.path.abspath(os.path.join(base_dir, "..", "5. Modelling", "Bert_model"))
+
+tokenizer = BertTokenizer.from_pretrained(model_path,  local_files_only=True)
+model = BertForSequenceClassification.from_pretrained(model_path,  local_files_only=True)
 model.eval()
 
 # Use GPU if available
@@ -36,25 +42,18 @@ def home():
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
-        text = request.form['text']
+        raw_text = request.form['text']
         
-        '''
-        # Load the vectorizer
-        vectorizer = load(r'5. Modelling\tfidf_vectorizer.pkl')
-        # Transform the input text
-        text_vectorized = vectorizer.transform([text])
-        
-        # Make prediction
-        prediction = model.predict(text_vectorized)[0] # Extract the scalar value
-        '''
-        # Tokenize the input text
+        cleaned_text = clean_text_pipeline(raw_text)
+        if cleaned_text == "invalid input":
+            return render_template('index.html', prediction="Input cannot be processed.") #input cannot be processed
         
         inputs = tokenizer(
-            text,
+            cleaned_text,
             return_tensors='pt',
             padding=True,
             truncation=True,
-            max_length=128
+            max_length=512
         )
         inputs = {k: v.to(device) for k, v in inputs.items()}
 
